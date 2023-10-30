@@ -7,5 +7,6 @@ class iAViscousFingersModuleInterface : public iAGUIModuleInterface
 public:
 	void Initialize() override;
 private slots:
-	void testAction();
+	void openSubWindow();
+	void loadDataFromSubWindow();
 };
