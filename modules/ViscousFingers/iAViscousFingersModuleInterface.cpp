@@ -123,7 +123,7 @@ void iAViscousFingersModuleInterface::loadDataFromSubWindow()
 			// Add these actors to the renderer
 			if (renderer)  // Assuming 'renderer' is accessible here
 			{
-				//renderer->AddActor(cylinderActor);
+				renderer->AddActor(cylinderActor);
 				renderer->AddActor(particlesActor);
 				renderer->ResetCamera();  // Reset camera view for the new actors
 
@@ -136,19 +136,6 @@ void iAViscousFingersModuleInterface::loadDataFromSubWindow()
 					vtkSmartPointer<vtkRenderWindowInteractor>::New();
 				interactor->SetRenderWindow(renderWindow);
 
-				// Create a Qt widget to contain the VTK rendering
-				//QWidget* widget = new QWidget();
-				//QVBoxLayout* layout = new QVBoxLayout(widget);
-
-				// Create a QVTKOpenGLWidget (or QVTKWidget) to display the VTK render window
-				//QVTKOpenGLWindow* vtkWidget = new QVTKOpenGLWindow();
-				//vtkWidget->add;
-
-				// Add the VTK widget to the layout
-				//layout->addWidget(vtkWidget);
-
-				// Show the widget
-				//widget->show();
 				interactor->Initialize();
 				interactor->Start();
 			}
@@ -163,7 +150,7 @@ void iAViscousFingersModuleInterface::loadDataFromSubWindow()
 vtkSmartPointer<vtkActor> createParticlesActor(vtkSmartPointer<vtkXMLUnstructuredGridReader> reader)
 {
 
-	vtkSmartPointer<vtkAssignAttribute> aa = vtkSmartPointer<vtkAssignAttribute>::New();
+vtkSmartPointer<vtkAssignAttribute> aa = vtkSmartPointer<vtkAssignAttribute>::New();
 	aa->Assign("concentration", vtkDataSetAttributes::SCALARS, vtkAssignAttribute::POINT_DATA);
 	aa->SetInputConnection(reader->GetOutputPort());
 
@@ -194,6 +181,23 @@ vtkSmartPointer<vtkActor> createParticlesActor(vtkSmartPointer<vtkXMLUnstructure
 	vtkSmartPointer<vtkProperty> prop = actor->GetProperty();
 	prop->SetPointSize(1.5);
 	prop->SetOpacity(0.7);
+
+	// Create a cylinder source
+	vtkSmartPointer<vtkCylinderSource> cylinder = vtkSmartPointer<vtkCylinderSource>::New();
+	cylinder->SetHeight(5.0);  // Set the height of the cylinder
+	cylinder->SetRadius(2.0);  // Set the radius of the cylinder
+	// You might need to set more properties of the cylinder source
+
+	// Create a mapper and actor for the cylinder
+	vtkSmartPointer<vtkPolyDataMapper> cylinderMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+	cylinderMapper->SetInputConnection(cylinder->GetOutputPort());
+
+	vtkSmartPointer<vtkActor> cylinderActor = vtkSmartPointer<vtkActor>::New();
+	cylinderActor->SetMapper(cylinderMapper);
+
+	// Set the transparency (opacity) of the cylinder
+	vtkSmartPointer<vtkProperty> cylinderProp = cylinderActor->GetProperty();
+	cylinderProp->SetOpacity(0.3);  // Adjust the opacity as needed (0.0 fully transparent, 1.0 fully opaque)
 
 	return actor;
 }
