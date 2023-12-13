@@ -11,4 +11,5 @@ public:
 private slots:
 	void openSubWindow();
 	void loadDataFromSubWindow();
+	void loadDataFromFolder();
 };

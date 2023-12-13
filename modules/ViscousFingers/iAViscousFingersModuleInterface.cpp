@@ -27,6 +27,8 @@
 #include <vtkCamera.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
+#include <vtkReebGraph.h>
+
 
 
 vtkSmartPointer<vtkActor> createParticlesActor(
@@ -91,11 +93,53 @@ void iAViscousFingersModuleInterface::openSubWindow()
 
 	connect(openFileButton, &QPushButton::clicked, this, &iAViscousFingersModuleInterface::loadDataFromSubWindow);
 
+	QPushButton* openFolderButton = new QPushButton("Load Folder");
+	layout->addWidget(openFolderButton);
+
+	connect(openFolderButton, &QPushButton::clicked, this, &iAViscousFingersModuleInterface::loadDataFromFolder);
+
+
 	if (subWindow.exec() == QDialog::Accepted)
 	{
 		// Handle any further actions here if needed
 	}
 }
+
+void iAViscousFingersModuleInterface::loadDataFromFolder()
+{
+	QString directoryPath = QFileDialog::getExistingDirectory(m_mainWnd, "Select Directory Containing .vtu Files", "");
+
+	if (!directoryPath.isEmpty())
+	{
+		QDir directory(directoryPath);
+		QStringList vtuFiles = directory.entryList(QStringList() << "*.vtu", QDir::Files);
+
+		if (!vtuFiles.isEmpty())
+		{
+			// Store the paths of the .vtu files in a QVector<QString> or any suitable data structure
+			QVector<QString> vtuFilePaths;
+
+			for (const QString& vtuFile : vtuFiles)
+			{
+				QString filePath = directory.absoluteFilePath(vtuFile);
+				vtuFilePaths.push_back(filePath);
+			}
+
+			// Now you have the paths of all .vtu files in the folder stored in vtuFilePaths
+			// You can perform further actions with these file paths as needed
+			// For example, you could save these paths for later use or perform additional processing
+
+
+			QMessageBox::information(m_mainWnd, "Files Loaded", "All vtu files loaded");
+		}
+		else
+		{
+			QMessageBox::warning(m_mainWnd, "No .vtu Files", "No .vtu files found in the selected directory.");
+		}
+	}
+}
+
+
 
 void iAViscousFingersModuleInterface::loadDataFromSubWindow()
 {
