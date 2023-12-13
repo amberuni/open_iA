@@ -11,6 +11,28 @@
 #include <QVBoxLayout>
 #include <QTextEdit>
 
+#include <vtkAssignAttribute.h>
+#include <vtkMaskPoints.h>
+#include <vtkThreshold.h>
+#include <vtkXMLUnstructuredGridReader.h>
+#include <vtkActor.h>
+#include <vtkGeometryFilter.h>
+#include <vtkDataSetMapper.h>
+#include <vtkTransform.h>
+#include <vtkProperty.h>
+#include <vtkLookupTable.h>
+#include <vtkCylinderSource.h>
+#include <vtkPolyDataMapper.h>
+#include <vtkRenderer.h>
+#include <vtkCamera.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+
+
+vtkSmartPointer<vtkActor> createParticlesActor(
+	vtkSmartPointer<vtkXMLUnstructuredGridReader> reader);
+vtkSmartPointer<vtkActor> createCylinderActor();
+
 void iAViscousFingersModuleInterface::Initialize()
 {
 	if (!m_mainWnd)  // if m_mainWnd is not set, we are running in command line mode
@@ -78,6 +100,12 @@ void iAViscousFingersModuleInterface::openSubWindow()
 void iAViscousFingersModuleInterface::loadDataFromSubWindow()
 {
 	QString filePath = QFileDialog::getOpenFileName(m_mainWnd, "Open .vtu File", "", "VTU Files (*.vtu)");
+	vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
+	vtkSmartPointer<vtkCamera> camera = vtkSmartPointer<vtkCamera>::New();
+	camera->SetPosition(0, -25.0, 12.5);
+	camera->SetFocalPoint(0, 0, 4.1);
+
+
 	if (!filePath.isEmpty())
 	{
 		if (filePath.endsWith(".vtu", Qt::CaseInsensitive))
@@ -85,10 +113,116 @@ void iAViscousFingersModuleInterface::loadDataFromSubWindow()
 			// Load the data from the selected .vtu file
 			// You can implement your data loading logic here
 			QMessageBox::information(m_mainWnd, "Data Loaded", "Data loaded from file: " + filePath);
+			vtkSmartPointer<vtkXMLUnstructuredGridReader> reader = vtkSmartPointer<vtkXMLUnstructuredGridReader>::New();
+			reader->SetFileName(filePath.toStdString().c_str());
+			reader->Update();  // Perform the actual data loading
+
+			// Create actors using loaded data (assuming functions createCylinderActor and createParticlesActor are defined)
+			vtkSmartPointer<vtkActor> cylinderActor = createCylinderActor();
+			vtkSmartPointer<vtkActor> particlesActor = createParticlesActor(reader);  // Pass the loaded data to the function
+			// Add these actors to the renderer
+			if (renderer)  // Assuming 'renderer' is accessible here
+			{
+				//renderer->AddActor(cylinderActor);
+				renderer->AddActor(particlesActor);
+				renderer->ResetCamera();  // Reset camera view for the new actors
+
+				 // Create a render window
+				vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+				renderWindow->AddRenderer(renderer);
+
+               // Create a VTK interactor
+				vtkSmartPointer<vtkRenderWindowInteractor> interactor =
+					vtkSmartPointer<vtkRenderWindowInteractor>::New();
+				interactor->SetRenderWindow(renderWindow);
+
+				// Create a Qt widget to contain the VTK rendering
+				//QWidget* widget = new QWidget();
+				//QVBoxLayout* layout = new QVBoxLayout(widget);
+
+				// Create a QVTKOpenGLWidget (or QVTKWidget) to display the VTK render window
+				//QVTKOpenGLWindow* vtkWidget = new QVTKOpenGLWindow();
+				//vtkWidget->add;
+
+				// Add the VTK widget to the layout
+				//layout->addWidget(vtkWidget);
+
+				// Show the widget
+				//widget->show();
+				interactor->Initialize();
+				interactor->Start();
+			}
 		}
 		else
 		{
 			QMessageBox::critical(m_mainWnd, "Invalid File", "Please select a .vtu file.");
 		}
 	}
+}
+
+vtkSmartPointer<vtkActor> createParticlesActor(vtkSmartPointer<vtkXMLUnstructuredGridReader> reader)
+{
+
+	vtkSmartPointer<vtkAssignAttribute> aa = vtkSmartPointer<vtkAssignAttribute>::New();
+	aa->Assign("concentration", vtkDataSetAttributes::SCALARS, vtkAssignAttribute::POINT_DATA);
+	aa->SetInputConnection(reader->GetOutputPort());
+
+	vtkSmartPointer<vtkMaskPoints> mask = vtkSmartPointer<vtkMaskPoints>::New();
+	mask->SetOnRatio(1);
+	mask->SetInputConnection(aa->GetOutputPort());
+	mask->GenerateVerticesOn();
+	mask->SingleVertexPerCellOn();
+
+	vtkSmartPointer<vtkGeometryFilter> geom = vtkSmartPointer<vtkGeometryFilter>::New();
+	geom->SetInputConnection(mask->GetOutputPort());
+
+	vtkSmartPointer<vtkLookupTable> lut = vtkSmartPointer<vtkLookupTable>::New();
+	lut->SetNumberOfColors(256);
+	lut->SetHueRange(0, 4.0 / 6.0);
+	lut->Build();
+
+	vtkSmartPointer<vtkDataSetMapper> mapper = vtkSmartPointer<vtkDataSetMapper>::New();
+	mapper->SetInputConnection(geom->GetOutputPort());
+	mapper->SetLookupTable(lut);
+	mapper->SetScalarRange(50, 350);
+	mapper->SetScalarModeToUsePointData();
+	mapper->ScalarVisibilityOn();
+
+	vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
+	actor->SetMapper(mapper);
+
+	vtkSmartPointer<vtkProperty> prop = actor->GetProperty();
+	prop->SetPointSize(1.5);
+	prop->SetOpacity(0.7);
+
+	return actor;
+}
+
+
+
+vtkSmartPointer<vtkActor> createCylinderActor()
+{
+	vtkSmartPointer<vtkCylinderSource> cylinder = vtkSmartPointer<vtkCylinderSource>::New();
+	cylinder->SetCenter(0, 0, 0);
+	cylinder->SetHeight(10);
+	cylinder->SetRadius(5);
+	cylinder->SetResolution(100);
+
+	vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+	mapper->SetInputConnection(cylinder->GetOutputPort());
+
+	vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
+	actor->SetMapper(mapper);
+
+	vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
+	transform->PostMultiply();
+	transform->RotateX(90.0);
+	transform->Translate(0, 0, 5);
+
+	actor->SetUserTransform(transform);
+
+	vtkSmartPointer<vtkProperty> prop = actor->GetProperty();
+	prop->SetOpacity(0.2);
+
+	return actor;
 }
