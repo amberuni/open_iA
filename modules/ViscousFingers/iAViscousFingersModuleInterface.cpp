@@ -28,12 +28,14 @@
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkReebGraph.h>
-
-
+#include <vtkDepthSortPolyData.h>
+#include <vtkGaussianSplatter.h>
 
 vtkSmartPointer<vtkActor> createParticlesActor(
-	vtkSmartPointer<vtkXMLUnstructuredGridReader> reader);
+	vtkSmartPointer<vtkXMLUnstructuredGridReader> reader, vtkSmartPointer<vtkCamera> camera);
 vtkSmartPointer<vtkActor> createCylinderActor();
+void setupVisualization(vtkSmartPointer<vtkActor> cylinderActor, vtkSmartPointer<vtkActor> particlesActor,
+	vtkSmartPointer<vtkRenderer> renderer);
 
 void iAViscousFingersModuleInterface::Initialize()
 {
@@ -108,6 +110,10 @@ void iAViscousFingersModuleInterface::openSubWindow()
 void iAViscousFingersModuleInterface::loadDataFromFolder()
 {
 	QString directoryPath = QFileDialog::getExistingDirectory(m_mainWnd, "Select Directory Containing .vtu Files", "");
+	vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
+	vtkSmartPointer<vtkCamera> camera = vtkSmartPointer<vtkCamera>::New();
+	camera->SetPosition(0, -25.0, 12.5);
+	camera->SetFocalPoint(0, 0, 4.1);
 
 	if (!directoryPath.isEmpty())
 	{
@@ -125,11 +131,16 @@ void iAViscousFingersModuleInterface::loadDataFromFolder()
 				vtuFilePaths.push_back(filePath);
 			}
 
-			// Now you have the paths of all .vtu files in the folder stored in vtuFilePaths
-			// You can perform further actions with these file paths as needed
-			// For example, you could save these paths for later use or perform additional processing
+			for (const QString& filePath : vtuFilePaths)
+			{
+				// Read .vtu file
+				vtkSmartPointer<vtkXMLUnstructuredGridReader> reader =
+					vtkSmartPointer<vtkXMLUnstructuredGridReader>::New();
+				reader->SetFileName(filePath.toStdString().c_str());
+				reader->Update();
 
-
+				
+			}
 			QMessageBox::information(m_mainWnd, "Files Loaded", "All vtu files loaded");
 		}
 		else
@@ -160,29 +171,10 @@ void iAViscousFingersModuleInterface::loadDataFromSubWindow()
 			vtkSmartPointer<vtkXMLUnstructuredGridReader> reader = vtkSmartPointer<vtkXMLUnstructuredGridReader>::New();
 			reader->SetFileName(filePath.toStdString().c_str());
 			reader->Update();  // Perform the actual data loading
-
-			// Create actors using loaded data (assuming functions createCylinderActor and createParticlesActor are defined)
 			vtkSmartPointer<vtkActor> cylinderActor = createCylinderActor();
-			vtkSmartPointer<vtkActor> particlesActor = createParticlesActor(reader);  // Pass the loaded data to the function
-			// Add these actors to the renderer
-			if (renderer)  // Assuming 'renderer' is accessible here
-			{
-				renderer->AddActor(cylinderActor);
-				renderer->AddActor(particlesActor);
-				renderer->ResetCamera();  // Reset camera view for the new actors
-
-				 // Create a render window
-				vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-				renderWindow->AddRenderer(renderer);
-
-               // Create a VTK interactor
-				vtkSmartPointer<vtkRenderWindowInteractor> interactor =
-					vtkSmartPointer<vtkRenderWindowInteractor>::New();
-				interactor->SetRenderWindow(renderWindow);
-
-				interactor->Initialize();
-				interactor->Start();
-			}
+			vtkSmartPointer<vtkActor> particlesActor =
+				createParticlesActor(reader, camera);  // Pass the loaded data to the function
+			setupVisualization(cylinderActor, particlesActor, renderer);
 		}
 		else
 		{
@@ -191,7 +183,8 @@ void iAViscousFingersModuleInterface::loadDataFromSubWindow()
 	}
 }
 
-vtkSmartPointer<vtkActor> createParticlesActor(vtkSmartPointer<vtkXMLUnstructuredGridReader> reader)
+vtkSmartPointer<vtkActor> createParticlesActor(
+	vtkSmartPointer<vtkXMLUnstructuredGridReader> reader, vtkSmartPointer<vtkCamera> camera)
 {
 
 vtkSmartPointer<vtkAssignAttribute> aa = vtkSmartPointer<vtkAssignAttribute>::New();
@@ -207,6 +200,14 @@ vtkSmartPointer<vtkAssignAttribute> aa = vtkSmartPointer<vtkAssignAttribute>::Ne
 	vtkSmartPointer<vtkGeometryFilter> geom = vtkSmartPointer<vtkGeometryFilter>::New();
 	geom->SetInputConnection(mask->GetOutputPort());
 
+    // Create a vtkDepthSortPolyData object
+	vtkSmartPointer<vtkDepthSortPolyData> sort = vtkSmartPointer<vtkDepthSortPolyData>::New();
+	// Set input connection to geom's output port
+	sort->SetInputConnection(geom->GetOutputPort());
+	// Set the sorting direction to back to front
+	sort->SetDirectionToBackToFront();
+	// Set the camera for depth sorting
+	sort->SetCamera(camera);
 	vtkSmartPointer<vtkLookupTable> lut = vtkSmartPointer<vtkLookupTable>::New();
 	lut->SetNumberOfColors(256);
 	lut->SetHueRange(0, 4.0 / 6.0);
@@ -230,7 +231,7 @@ vtkSmartPointer<vtkAssignAttribute> aa = vtkSmartPointer<vtkAssignAttribute>::Ne
 	vtkSmartPointer<vtkCylinderSource> cylinder = vtkSmartPointer<vtkCylinderSource>::New();
 	cylinder->SetHeight(5.0);  // Set the height of the cylinder
 	cylinder->SetRadius(2.0);  // Set the radius of the cylinder
-	// You might need to set more properties of the cylinder source
+
 
 	// Create a mapper and actor for the cylinder
 	vtkSmartPointer<vtkPolyDataMapper> cylinderMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
@@ -241,7 +242,7 @@ vtkSmartPointer<vtkAssignAttribute> aa = vtkSmartPointer<vtkAssignAttribute>::Ne
 
 	// Set the transparency (opacity) of the cylinder
 	vtkSmartPointer<vtkProperty> cylinderProp = cylinderActor->GetProperty();
-	cylinderProp->SetOpacity(0.3);  // Adjust the opacity as needed (0.0 fully transparent, 1.0 fully opaque)
+	cylinderProp->SetOpacity(0.0);  // Adjust the opacity as needed (0.0 fully transparent, 1.0 fully opaque)
 
 	return actor;
 }
@@ -273,4 +274,29 @@ vtkSmartPointer<vtkActor> createCylinderActor()
 	prop->SetOpacity(0.2);
 
 	return actor;
+}
+
+// Function to set up visualization
+void setupVisualization(vtkSmartPointer<vtkActor> cylinderActor, vtkSmartPointer<vtkActor> particlesActor,
+	vtkSmartPointer<vtkRenderer> renderer)
+{
+	if (renderer)
+	{
+		// Add actors to the renderer
+		renderer->AddActor(cylinderActor);
+		renderer->AddActor(particlesActor);
+		renderer->ResetCamera();  // Reset camera view for the new actors
+
+		// Create a render window
+		vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+		renderWindow->AddRenderer(renderer);
+
+		vtkSmartPointer<vtkRenderWindowInteractor> interactor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+		interactor->SetRenderWindow(renderWindow);
+		// Set up a VTK interactor
+		interactor->SetRenderWindow(renderWindow);
+
+		interactor->Initialize();
+		interactor->Start();
+	}
 }
