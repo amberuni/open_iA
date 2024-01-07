@@ -5,7 +5,16 @@ set(DEPENDENCIES_LIBRARIES
 )
 set(DEPENDENCIES_VTK_MODULES
 	ChartsCore            # for vtkAxis
-	FiltersHybrid         # for vtkPolyDataSilhouette
+	CommonDataModel
 	ImagingHybrid         # for vtkSampleFunction used in iABlobCluster
-	ImagingGeneral	
+	ImagingGeneral
+	ImagingStencil
+	ImagingFourier
+	FiltersReebGraph
+	FiltersPoints
+	FiltersGeneric
+	FiltersGeometry
+	FiltersHybrid
+	FiltersExtraction
+	FiltersTexture
 )
