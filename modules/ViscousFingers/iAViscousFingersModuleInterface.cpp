@@ -1,4 +1,6 @@
 #include "iAViscousFingersModuleInterface.h"
+#include "Particleactors.h"
+
 #include "iAMainWindow.h"
 #include <QAction>
 #include <QMessageBox>
@@ -37,25 +39,13 @@
 #include <vtkGaussianSplatter.h>
 
 std:: vector<vtkSmartPointer<vtkXMLUnstructuredGridReader>> fileReaders;
-std:: vector<vtkReebGraph> reeb_graphs;
 vtkSmartPointer<vtkXMLUnstructuredGridReader> selectedReader;
 QStringList vtuFiles;
+
 bool pactor_set = false;
 bool cactor_set = false;
-bool velocitychnage_set = false;
-bool velocityconc_set = false;
-
-vtkSmartPointer<vtkActor> particle_actor_conc_only(
-	vtkSmartPointer<vtkXMLUnstructuredGridReader> reader, vtkSmartPointer<vtkCamera> camera);
-vtkSmartPointer<vtkActor> particle_actor_conc_cyclinder(
-	vtkSmartPointer<vtkXMLUnstructuredGridReader> reader, vtkSmartPointer<vtkCamera> camera);
-vtkSmartPointer<vtkActor> particle_actor_cyckinder_only();
-vtkSmartPointer<vtkActor> particle_actor_conc_velocity(
-	vtkSmartPointer<vtkXMLUnstructuredGridReader> reader, vtkSmartPointer<vtkCamera> camera);
-
-void create_single_reeb_graph(vtkSmartPointer<vtkXMLUnstructuredGridReader> reader);
-void create_multiple_reeb_graphs(
-	std::vector<vtkSmartPointer<vtkXMLUnstructuredGridReader>> fileReaders, std::vector<vtkReebGraph> reeb_graphs);
+bool velocity_set = false;
+bool conc_set = false;
 
 void iAViscousFingersModuleInterface::Initialize()
 {
@@ -184,7 +174,9 @@ void iAViscousFingersModuleInterface::loadDataFromFolder()
 }
 
 void iAViscousFingersModuleInterface::interaction_window()
-{
+{	
+
+
 	if (fileReaders.empty())
 	{
 		QMessageBox::warning(m_mainWnd, "No .vtu Files", "First Load data");
@@ -258,6 +250,7 @@ void iAViscousFingersModuleInterface::interaction_window()
 	controlLayout->addWidget(showParticlesCheckBox);
 	controlLayout->addWidget(showvelocitychnageCheckBox);
 	controlLayout->addWidget(showConcCheckBox);
+	controlLayout->addWidget(showConcCheckBox);
 
 	splitter->addWidget(controlPanel);
 
@@ -272,18 +265,23 @@ void iAViscousFingersModuleInterface::interaction_window()
 	QPushButton* Visualize = new QPushButton("Visualize Data");
 	controlLayout->addWidget(Visualize);
 
+	QPushButton* reeb_graph = new QPushButton("Reeb Graph");
+	controlLayout->addWidget(reeb_graph);
+
 	connect(Visualize, &QPushButton::clicked, this,
 		[=]()
 		{
 			try
 			{
 				renderer->RemoveAllViewProps();  // Clear the renderer
+				
+				ParticleActors particleActors;
 
-				vtkSmartPointer<vtkActor> cylinderActor = particle_actor_cyckinder_only();
-				vtkSmartPointer<vtkActor> particlesActor = particle_actor_conc_cyclinder(selectedReader, camera);
-				vtkSmartPointer<vtkActor> particle_actor_conc = particle_actor_conc_only(selectedReader, camera);
-				vtkSmartPointer<vtkActor> particle_actor_conc_vel =
-					particle_actor_conc_velocity(selectedReader, camera);
+                vtkSmartPointer<vtkActor> cylinderActor = particleActors.Cylinder_view ();
+				vtkSmartPointer<vtkActor> particlesActor =
+					particleActors.Conccenration_cyclinder_view (selectedReader, camera);
+				vtkSmartPointer<vtkActor> particleActorConc = particleActors.Conccenration_view (selectedReader, camera);
+				vtkSmartPointer<vtkActor> particleActorVel = particleActors.velocity_view (selectedReader, camera);
 
 
 				// Check if actors are valid before adding them
@@ -291,10 +289,10 @@ void iAViscousFingersModuleInterface::interaction_window()
 					renderer->AddActor(cylinderActor);
 				if (particlesActor && pactor_set)
 					renderer->AddActor(particlesActor);
-				if (particle_actor_conc && velocitychnage_set)
-					renderer->AddActor(particle_actor_conc);
-				if (particle_actor_conc_vel && velocityconc_set)
-					renderer->AddActor(particle_actor_conc_vel);
+				if (particleActorConc && conc_set)
+					renderer->AddActor(particleActorConc);
+				if (particleActorVel && velocity_set)
+					renderer->AddActor(particleActorVel);
 
 				renderer->ResetCamera();
 				
@@ -313,6 +311,9 @@ void iAViscousFingersModuleInterface::interaction_window()
 				// Log error messages or handle exceptions here
 				qDebug() << "Exception occurred: " << e.what();
 			}
+		});
+	connect(reeb_graph, &QPushButton::clicked, this, [=]() {
+			create_single_reeb_graph(selectedReader);		
 		});
 	// Set the file name for the reader based on the selected file
 	connect(fileComboBox, QOverload<int>::of(&QComboBox::activated),
@@ -352,11 +353,11 @@ void iAViscousFingersModuleInterface::interaction_window()
 		{
 			if (state == Qt::Checked)
 			{
-				velocitychnage_set = true;
+				velocity_set = true;
 			}
 			else
 			{
-				velocitychnage_set = false;
+				velocity_set = false;
 			}
 		});
 	connect(showConcCheckBox, &QCheckBox::stateChanged,
@@ -364,11 +365,11 @@ void iAViscousFingersModuleInterface::interaction_window()
 		{
 			if (state == Qt::Checked)
 			{
-				velocityconc_set = true;
+				conc_set = true;
 			}
 			else
 			{
-				velocityconc_set = false;
+				conc_set = false;
 			}
 		});
 
@@ -378,220 +379,28 @@ void iAViscousFingersModuleInterface::interaction_window()
 	}
 }
 
-vtkSmartPointer<vtkActor> particle_actor_conc_only(
-	vtkSmartPointer<vtkXMLUnstructuredGridReader> reader, vtkSmartPointer<vtkCamera> camera)
+
+void iAViscousFingersModuleInterface::create_single_reeb_graph(vtkSmartPointer<vtkXMLUnstructuredGridReader> reader)
 {
+	vtkSmartPointer<vtkUnstructuredGrid> grid = reader->GetOutput();
 
-	vtkSmartPointer<vtkAssignAttribute> aa = vtkSmartPointer<vtkAssignAttribute>::New();
-	aa->Assign("concentration", vtkDataSetAttributes::SCALARS, vtkAssignAttribute::POINT_DATA);
-	aa->SetInputConnection(reader->GetOutputPort());
-	vtkPointData* pointData = reader->GetOutput()->GetPointData();
-	vtkDataArray* velocityArray = pointData->GetArray("velocity");
+	vtkSmartPointer<vtkPointData> pointData = grid->GetPointData();
+	int numArrays = pointData->GetNumberOfArrays();
 
-	vtkSmartPointer<vtkMaskPoints> mask = vtkSmartPointer<vtkMaskPoints>::New();
-	mask->SetOnRatio(1);
-	mask->SetInputConnection(aa->GetOutputPort());
-	mask->GenerateVerticesOn();
-	mask->SingleVertexPerCellOn();
+	std::string arraysInfo = "Arrays in PointData:\n";
 
-	vtkSmartPointer<vtkThreshold> threshold = vtkSmartPointer<vtkThreshold>::New();
-	threshold->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "velocity");
-	threshold->SetLowerThreshold(0.3);
-
-	// Connect mask to threshold
-	threshold->SetInputConnection(mask->GetOutputPort());
-
-	vtkSmartPointer<vtkGeometryFilter> geom = vtkSmartPointer<vtkGeometryFilter>::New();
-	geom->SetInputConnection(threshold->GetOutputPort());
-
-    // Create a vtkDepthSortPolyData object
-	vtkSmartPointer<vtkDepthSortPolyData> sort = vtkSmartPointer<vtkDepthSortPolyData>::New();
-	// Set input connection to geom's output port
-	sort->SetInputConnection(geom->GetOutputPort());
-	// Set the sorting direction to back to front
-	sort->SetDirectionToBackToFront();
-	// Set the camera for depth sorting
-	sort->SetCamera(camera);
-	vtkSmartPointer<vtkLookupTable> lut = vtkSmartPointer<vtkLookupTable>::New();
-	lut->SetNumberOfColors(256);
-	lut->SetHueRange(0, 4.0 / 6.0);
-	lut->Build();
-
-	vtkSmartPointer<vtkDataSetMapper> mapper = vtkSmartPointer<vtkDataSetMapper>::New();
-	mapper->SetInputConnection(geom->GetOutputPort());
-	mapper->SetLookupTable(lut);
-	mapper->SetScalarRange(50, 250);
-	mapper->SetScalarModeToUsePointData();
-	mapper->ScalarVisibilityOn();
-
-	vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-	actor->SetMapper(mapper);
-
-	vtkSmartPointer<vtkProperty> prop = actor->GetProperty();
-	prop->SetPointSize(1.5);
-	prop->SetOpacity(0.7);
-
-	// Create a cylinder source
-	vtkSmartPointer<vtkCylinderSource> cylinder = vtkSmartPointer<vtkCylinderSource>::New();
-	cylinder->SetHeight(5.0);  // Set the height of the cylinder
-	cylinder->SetRadius(2.0);  // Set the radius of the cylinder
-
-
-	// Create a mapper and actor for the cylinder
-	vtkSmartPointer<vtkPolyDataMapper> cylinderMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-	cylinderMapper->SetInputConnection(cylinder->GetOutputPort());
-
-	vtkSmartPointer<vtkActor> cylinderActor = vtkSmartPointer<vtkActor>::New();
-	cylinderActor->SetMapper(cylinderMapper);
-
-	// Set the transparency (opacity) of the cylinder
-	vtkSmartPointer<vtkProperty> cylinderProp = cylinderActor->GetProperty();
-	cylinderProp->SetOpacity(0.0);  // Adjust the opacity as needed (0.0 fully transparent, 1.0 fully opaque)
-
-	return actor;
-}
-
-vtkSmartPointer<vtkActor> particle_actor_conc_cyclinder (
-	vtkSmartPointer<vtkXMLUnstructuredGridReader> reader, vtkSmartPointer<vtkCamera> camera)
-{
-	vtkSmartPointer<vtkAssignAttribute> aa = vtkSmartPointer<vtkAssignAttribute>::New();
-	aa->Assign("concentration", vtkDataSetAttributes::SCALARS, vtkAssignAttribute::POINT_DATA);
-	aa->SetInputConnection(reader->GetOutputPort());
-	vtkPointData* pointData = reader->GetOutput()->GetPointData();
-	vtkDataArray* velocityArray = pointData->GetArray("velocity");
-
-	vtkSmartPointer<vtkMaskPoints> mask = vtkSmartPointer<vtkMaskPoints>::New();
-	mask->SetOnRatio(1);
-	mask->SetInputConnection(aa->GetOutputPort());
-	mask->GenerateVerticesOn();
-	mask->SingleVertexPerCellOn();
-
-	vtkSmartPointer<vtkGeometryFilter> geom = vtkSmartPointer<vtkGeometryFilter>::New();
-	geom->SetInputConnection(mask->GetOutputPort());
-
-	// Create a vtkDepthSortPolyData object
-	vtkSmartPointer<vtkDepthSortPolyData> sort = vtkSmartPointer<vtkDepthSortPolyData>::New();
-	sort->SetInputConnection(geom->GetOutputPort());
-	sort->SetDirectionToBackToFront();
-	sort->SetCamera(camera);
-
-	vtkSmartPointer<vtkLookupTable> lut = vtkSmartPointer<vtkLookupTable>::New();
-	lut->SetNumberOfColors(256);
-	lut->SetHueRange(0, 4.0 / 6.0);
-	lut->Build();
-
-	vtkSmartPointer<vtkDataSetMapper> mapper = vtkSmartPointer<vtkDataSetMapper>::New();
-	mapper->SetInputConnection(geom->GetOutputPort());
-	mapper->SetLookupTable(lut);
-	mapper->SetScalarRange(50, 250);
-	mapper->SetScalarModeToUsePointData();
-	mapper->ScalarVisibilityOn();
-
-	vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-	actor->SetMapper(mapper);
-
-	vtkSmartPointer<vtkProperty> prop = actor->GetProperty();
-	prop->SetPointSize(1.5);
-	prop->SetOpacity(0.7);
-
-	// Create a cylinder source
-	vtkSmartPointer<vtkCylinderSource> cylinder = vtkSmartPointer<vtkCylinderSource>::New();
-	cylinder->SetHeight(5.0);  // Set the height of the cylinder
-	cylinder->SetRadius(2.0);  // Set the radius of the cylinder
-
-	// Create a mapper and actor for the cylinder
-	vtkSmartPointer<vtkPolyDataMapper> cylinderMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-	cylinderMapper->SetInputConnection(cylinder->GetOutputPort());
-
-	vtkSmartPointer<vtkActor> cylinderActor = vtkSmartPointer<vtkActor>::New();
-	cylinderActor->SetMapper(cylinderMapper);
-
-	// Set the transparency (opacity) of the cylinder
-	vtkSmartPointer<vtkProperty> cylinderProp = cylinderActor->GetProperty();
-	cylinderProp->SetOpacity(0.0);  // Adjust the opacity as needed (0.0 fully transparent, 1.0 fully opaque)
-
-	return actor;
-}
-
-
-vtkSmartPointer<vtkActor> particle_actor_cyckinder_only()
-{
-	vtkSmartPointer<vtkCylinderSource> cylinder = vtkSmartPointer<vtkCylinderSource>::New();
-	cylinder->SetCenter(0, 0, 0);
-	cylinder->SetHeight(10);
-	cylinder->SetRadius(5);
-	cylinder->SetResolution(100);
-
-	vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-	mapper->SetInputConnection(cylinder->GetOutputPort());
-
-	vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-	actor->SetMapper(mapper);
-
-	vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
-	transform->PostMultiply();
-	transform->RotateX(90.0);
-	transform->Translate(0, 0, 5);
-
-	actor->SetUserTransform(transform);
-
-	vtkSmartPointer<vtkProperty> prop = actor->GetProperty();
-	prop->SetOpacity(0.2);
-
-	return actor;
-}
-
-vtkSmartPointer<vtkActor> particle_actor_conc_velocity(
-	vtkSmartPointer<vtkXMLUnstructuredGridReader> reader, vtkSmartPointer<vtkCamera> camera)
-{
-	// Fetch point data arrays
-	vtkPointData* pointData = reader->GetOutput()->GetPointData();
-	vtkDataArray* velocityArray = pointData->GetArray("velocity");
-	vtkDataArray* concentrationArray = pointData->GetArray("concentration");
-	vtkDataArray* pointsArray = reader->GetOutput()->GetPoints()->GetData();
-
-	if (!velocityArray || !concentrationArray || !pointsArray)
+	for (int i = 0; i < numArrays; ++i)
 	{
-		qDebug() << "Required arrays not found in the dataset.";
-		return nullptr;  // Return null actor if required arrays are not present
+		vtkSmartPointer<vtkDataArray> array = pointData->GetArray(i);
+		if (array)
+		{
+			arraysInfo += "Array " + std::to_string(i) + ": " + array->GetName() + "\n";
+		}
 	}
 
-	// Create a mask to filter particles based on velocity magnitude
-	vtkSmartPointer<vtkMaskPoints> mask = vtkSmartPointer<vtkMaskPoints>::New();
-	mask->SetOnRatio(1);
-	mask->SetInputConnection(reader->GetOutputPort());
-	mask->GenerateVerticesOn();
-	mask->SingleVertexPerCellOn();
+	QMessageBox::information(m_mainWnd, "Arrays in PointData", arraysInfo.c_str());
 
-	vtkSmartPointer<vtkThreshold> threshold = vtkSmartPointer<vtkThreshold>::New();
-	threshold->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_POINTS, "velocity");
-	threshold->SetLowerThreshold(0.3);
-
-	// Connect mask to threshold
-	threshold->SetInputConnection(mask->GetOutputPort());
-
-	vtkSmartPointer<vtkGeometryFilter> geom = vtkSmartPointer<vtkGeometryFilter>::New();
-	geom->SetInputConnection(threshold->GetOutputPort());
-
-	vtkSmartPointer<vtkLookupTable> lut = vtkSmartPointer<vtkLookupTable>::New();
-	lut->SetNumberOfColors(256);
-	lut->SetHueRange(0, 4.0 / 6.0);
-	lut->Build();
-
-	// Create mapper and actor for the filtered particles
-	vtkSmartPointer<vtkDataSetMapper> mapper = vtkSmartPointer<vtkDataSetMapper>::New();
-	mapper->SetInputConnection(geom->GetOutputPort());
-	mapper->SetLookupTable(lut);
-	mapper->SetScalarRange(50, 250);
-	mapper->SetScalarModeToUsePointData();
-	mapper->ScalarVisibilityOn();
-
-	vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
-	actor->SetMapper(mapper);
-
-	vtkSmartPointer<vtkProperty> prop = actor->GetProperty();
-	prop->SetPointSize(1.5);
-	prop->SetOpacity(0.7);
-
-	return actor;
+	// Create Reeb graph
+	vtkSmartPointer<vtkReebGraph> reebGraph = vtkSmartPointer<vtkReebGraph>::New();
+	int ret = reebGraph->Build(grid, "concentration");
 }

@@ -1,10 +1,8 @@
 #pragma once
 #include <iAGUIModuleInterface.h>
 
-#include <vtkActor.h>
-#include <vtkRenderer.h>
 #include <vtkSmartPointer.h>
-#include <vtkRenderWindowInteractor.h>
+#include <vtkXMLUnstructuredGridReader.h>
 
 
 class iAViscousFingersModuleInterface : public iAGUIModuleInterface
@@ -17,5 +15,5 @@ private slots:
 	void openSubWindow();
 	void loadDataFromFolder();
 	void interaction_window();
-
+	void create_single_reeb_graph(vtkSmartPointer<vtkXMLUnstructuredGridReader> reader);
 };
