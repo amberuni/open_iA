@@ -1,5 +1,6 @@
 #include "iAViscousFingersModuleInterface.h"
 #include "Particleactors.h"
+#include "ViscousFingersReebGraph.h"
 
 #include "iAMainWindow.h"
 #include <QAction>
@@ -37,6 +38,7 @@
 #include <vtkReebGraph.h>
 #include <vtkDepthSortPolyData.h>
 #include <vtkGaussianSplatter.h>
+#include <vtkUnstructuredGridToReebGraphFilter.h>
 
 std:: vector<vtkSmartPointer<vtkXMLUnstructuredGridReader>> fileReaders;
 vtkSmartPointer<vtkXMLUnstructuredGridReader> selectedReader;
@@ -164,6 +166,7 @@ void iAViscousFingersModuleInterface::loadDataFromFolder()
 				fileReaders.push_back(reader);
 				
 			}
+			selectedReader = fileReaders[0];
 			QMessageBox::information(m_mainWnd, "Files Loaded", "All vtu files loaded");
 		}
 		else
@@ -268,6 +271,8 @@ void iAViscousFingersModuleInterface::interaction_window()
 	QPushButton* reeb_graph = new QPushButton("Reeb Graph");
 	controlLayout->addWidget(reeb_graph);
 
+
+
 	connect(Visualize, &QPushButton::clicked, this,
 		[=]()
 		{
@@ -313,7 +318,10 @@ void iAViscousFingersModuleInterface::interaction_window()
 			}
 		});
 	connect(reeb_graph, &QPushButton::clicked, this, [=]() {
-			create_single_reeb_graph(selectedReader);		
+			// Create an instance of ReebGraphHandler
+			ViscousFingersReebGraph reebGraphHandler;
+
+			reebGraphHandler.createSingleReebGraph(selectedReader);
 		});
 	// Set the file name for the reader based on the selected file
 	connect(fileComboBox, QOverload<int>::of(&QComboBox::activated),
@@ -379,28 +387,3 @@ void iAViscousFingersModuleInterface::interaction_window()
 	}
 }
 
-
-void iAViscousFingersModuleInterface::create_single_reeb_graph(vtkSmartPointer<vtkXMLUnstructuredGridReader> reader)
-{
-	vtkSmartPointer<vtkUnstructuredGrid> grid = reader->GetOutput();
-
-	vtkSmartPointer<vtkPointData> pointData = grid->GetPointData();
-	int numArrays = pointData->GetNumberOfArrays();
-
-	std::string arraysInfo = "Arrays in PointData:\n";
-
-	for (int i = 0; i < numArrays; ++i)
-	{
-		vtkSmartPointer<vtkDataArray> array = pointData->GetArray(i);
-		if (array)
-		{
-			arraysInfo += "Array " + std::to_string(i) + ": " + array->GetName() + "\n";
-		}
-	}
-
-	QMessageBox::information(m_mainWnd, "Arrays in PointData", arraysInfo.c_str());
-
-	// Create Reeb graph
-	vtkSmartPointer<vtkReebGraph> reebGraph = vtkSmartPointer<vtkReebGraph>::New();
-	int ret = reebGraph->Build(grid, "concentration");
-}

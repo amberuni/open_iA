@@ -15,5 +15,4 @@ private slots:
 	void openSubWindow();
 	void loadDataFromFolder();
 	void interaction_window();
-	void create_single_reeb_graph(vtkSmartPointer<vtkXMLUnstructuredGridReader> reader);
 };
