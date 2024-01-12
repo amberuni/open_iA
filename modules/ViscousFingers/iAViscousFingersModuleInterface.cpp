@@ -14,31 +14,15 @@
 #include <QSplitter>
 #include <QComboBox>
 #include <QCheckBox>
-#include <iAQVTKWidget.h>
-#include <vtkGenericOpenGLRenderWindow.h>
-#include <vtkUnstructuredGrid.h>
-#include <vtkPointData.h>
 
-#include <vtkAssignAttribute.h>
-#include <vtkMaskPoints.h>
-#include <vtkThreshold.h>
 #include <vtkXMLUnstructuredGridReader.h>
 #include <vtkActor.h>
-#include <vtkGeometryFilter.h>
-#include <vtkDataSetMapper.h>
-#include <vtkTransform.h>
 #include <vtkProperty.h>
-#include <vtkLookupTable.h>
-#include <vtkCylinderSource.h>
-#include <vtkPolyDataMapper.h>
 #include <vtkRenderer.h>
 #include <vtkCamera.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
-#include <vtkReebGraph.h>
-#include <vtkDepthSortPolyData.h>
-#include <vtkGaussianSplatter.h>
-#include <vtkUnstructuredGridToReebGraphFilter.h>
+
 
 // Store all the read .vtu files in the vector.
 std:: vector<vtkSmartPointer<vtkXMLUnstructuredGridReader>> fileReaders;
