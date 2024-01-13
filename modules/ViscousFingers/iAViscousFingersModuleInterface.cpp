@@ -1,6 +1,7 @@
 #include "iAViscousFingersModuleInterface.h"
 #include "Particleactors.h"
 #include "ViscousFingersReebGraph.h"
+#include "ViscousFingersScatter.h"
 
 #include "iAMainWindow.h"
 #include <QAction>
@@ -307,6 +308,12 @@ void iAViscousFingersModuleInterface::interaction_window()
 	QPushButton* reeb_graph = new QPushButton("Reeb Graph");
 	controlLayout->addWidget(reeb_graph);
 
+	QPushButton* single_plot = new QPushButton("Single Concentration Velocity Plot");
+	controlLayout->addWidget(single_plot);
+
+	QPushButton* full_plot = new QPushButton("Full Concentration Velocity Plot");
+	controlLayout->addWidget(full_plot);
+
     // Connect signals and slots for button clicks and checkbox state changes
 	connect(Visualize, &QPushButton::clicked, this,
 		[=]()
@@ -374,7 +381,20 @@ void iAViscousFingersModuleInterface::interaction_window()
 		{
 			selectedReader = fileReaders[index];
 		});
-
+	// Connect Plots single
+	connect(single_plot, &QPushButton::clicked, this,
+		[=]()
+		{ 
+			ScatterGraph scatter;
+			scatter.Plot_scatter_graph_for_one_vtu(selectedReader);
+		});
+	// Connect Plots full
+	connect(full_plot, &QPushButton::clicked, this,
+		[=]()
+		{ 
+			ScatterGraph scatter;
+			scatter.Plot_scatter_graph_for_all_vtu(fileReaders);
+		});
 	// Connect slots to handle checkbox state changes for different views
 	connect(showCylinderCheckBox, &QCheckBox::stateChanged,
 		[=](int state)

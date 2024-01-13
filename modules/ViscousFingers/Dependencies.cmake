@@ -10,6 +10,7 @@ set(DEPENDENCIES_VTK_MODULES
 	ImagingGeneral
 	ImagingStencil
 	ImagingFourier
+	ImagingStatistics
 	FiltersReebGraph
 	FiltersPoints
 	FiltersGeneric
@@ -17,4 +18,7 @@ set(DEPENDENCIES_VTK_MODULES
 	FiltersHybrid
 	FiltersExtraction
 	FiltersTexture
+	RenderingContext2D
+	RenderingContextOpenGL2
+	ViewsContext2D
 )
