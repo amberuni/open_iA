@@ -1,7 +1,7 @@
 #include "iAViscousFingersModuleInterface.h"
 #include "Particleactors.h"
 #include "ViscousFingersReebGraph.h"
-#include "ViscousFingersScatter.h"
+#include "ViscousFingersStats.h"
 
 #include "iAMainWindow.h"
 #include <QAction>
@@ -314,6 +314,16 @@ void iAViscousFingersModuleInterface::interaction_window()
 	QPushButton* full_plot = new QPushButton("Full Concentration Velocity Plot");
 	controlLayout->addWidget(full_plot);
 
+	QPushButton* bag_single_plot = new QPushButton("Single Concentration Velocity Bag Plot");
+	controlLayout->addWidget(bag_single_plot);
+
+	QPushButton* bag_full_plot = new QPushButton("Full Concentration Velocity Bag Plot");
+	controlLayout->addWidget(bag_full_plot);
+
+	QPushButton* con_line_plot = new QPushButton("Avg Concentration timestmap");
+	controlLayout->addWidget(con_line_plot);
+
+
     // Connect signals and slots for button clicks and checkbox state changes
 	connect(Visualize, &QPushButton::clicked, this,
 		[=]()
@@ -385,16 +395,38 @@ void iAViscousFingersModuleInterface::interaction_window()
 	connect(single_plot, &QPushButton::clicked, this,
 		[=]()
 		{ 
-			ScatterGraph scatter;
+			StatGraph scatter;
 			scatter.Plot_scatter_graph_for_one_vtu(selectedReader);
 		});
 	// Connect Plots full
 	connect(full_plot, &QPushButton::clicked, this,
 		[=]()
 		{ 
-			ScatterGraph scatter;
+			StatGraph scatter;
 			scatter.Plot_scatter_graph_for_all_vtu(fileReaders);
 		});
+	// Connect bag Plots single
+	connect(bag_single_plot, &QPushButton::clicked, this,
+		[=]()
+		{
+			StatGraph bag;
+			bag.Plot_bag_plot_for_one_vtu(selectedReader);
+		});
+	// Connect bag Plots full
+	connect(bag_full_plot, &QPushButton::clicked, this,
+		[=]()
+		{
+			StatGraph bag;
+			bag.Plot_bag_plots_for_all_vtu(fileReaders);
+		});
+	// Connect line Plots conc
+	connect(con_line_plot, &QPushButton::clicked, this,
+		[=]()
+		{
+			StatGraph line;
+			line.Plot_average_concentration_line_graph(fileReaders);
+		});
+
 	// Connect slots to handle checkbox state changes for different views
 	connect(showCylinderCheckBox, &QCheckBox::stateChanged,
 		[=](int state)
